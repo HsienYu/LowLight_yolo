@@ -80,7 +80,51 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Test Detection
+### 2. Model Weights
+
+#### Auto-Download (Recommended)
+
+All YOLO and RT-DETR models are automatically downloaded from Ultralytics on first use. Simply run any detection command and the required model will be downloaded to the `models/` directory.
+
+#### Manual Download
+
+If you prefer to download models manually, here are the direct links:
+
+**YOLOv8 Models:**
+- [YOLOv8s](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt) - Small (default, 22MB)
+- [YOLOv8m](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m.pt) - Medium (real_time preset, 52MB)
+
+**YOLOv10 Models:**
+- [YOLOv10m](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov10m.pt) - Medium (balanced preset, 32MB)
+
+**RT-DETR Models:**
+- [RT-DETR-X](https://github.com/ultralytics/assets/releases/download/v8.3.0/rtdetr-x.pt) - Extra Large (max_accuracy preset, 141MB)
+
+**Download and place in `models/` directory:**
+```bash
+mkdir -p models
+cd models
+
+# Download required models
+wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m.pt
+wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov10m.pt
+wget https://github.com/ultralytics/assets/releases/download/v8.3.0/rtdetr-x.pt
+
+cd ..
+```
+
+#### Zero-DCE++ Weights (Included)
+
+The Zero-DCE++ model weights (`models/zero_dce_plus.pth`, 315KB) are included in this repository for advanced low-light enhancement. No additional download needed.
+
+**Required for these presets:**
+- `ultra_accuracy` - RT-DETR-X + Zero-DCE++ Sequential
+- `adaptive_smart` - YOLOv8m + Adaptive enhancement
+- `ensemble_max` - YOLOv8m + Multi-enhancement fusion
+
+For detailed Zero-DCE++ usage, see [docs/ZERO_DCE_GUIDE.md](docs/ZERO_DCE_GUIDE.md).
+
+### 3. Test Detection
 
 ```bash
 # Quick test with best preset
@@ -93,7 +137,7 @@ python scripts/detect.py path/to/image.jpg -m rtdetr-x.pt --clahe -o results/out
 python scripts/detect.py path/to/image.jpg --compare -o results/comparison/
 ```
 
-### 3. Batch Processing
+### 4. Batch Processing
 
 ```bash
 # Process entire directory with max accuracy
@@ -105,7 +149,7 @@ python scripts/batch_detect.py data/images --preset max_accuracy \
     --save-images --max-images 50 -o results/test.csv
 ```
 
-### 4. Results
+### 5. Results
 
 - Annotated images in `results/` or specified output directory
 - CSV reports with detection counts and confidence scores
@@ -736,14 +780,17 @@ python scripts/detect.py image.jpg --preset max_accuracy --device cuda
 
 ### Model Files Location
 
-- `rtdetr-x.pt` - RT-DETR-X model (auto-downloaded on first use)
-- `rtdetr-l.pt` - RT-DETR-L model
-- `yolov10m.pt` - YOLOv10m model
-- `yolov10s.pt` - YOLOv10s model
-- `yolov8m.pt` - YOLOv8m model
-- `yolov8s.pt` - YOLOv8s model
+**YOLO/RT-DETR Models (Auto-downloaded):**
+- `models/yolov8s.pt` - YOLOv8 Small (default, 22MB)
+- `models/yolov8m.pt` - YOLOv8 Medium (real_time preset, 52MB)
+- `models/yolov10m.pt` - YOLOv10 Medium (balanced preset, 32MB)
+- `models/rtdetr-x.pt` - RT-DETR Extra Large (max_accuracy preset, 141MB)
 
-All models are downloaded automatically from Ultralytics on first use.
+**Zero-DCE++ Model (Included):**
+- `models/zero_dce_plus.pth` - Zero-DCE++ weights (315KB, included in repo)
+
+All YOLO/RT-DETR models are downloaded automatically from Ultralytics on first use.
+For manual downloads, see the "Model Weights" section above.
 
 ---
 

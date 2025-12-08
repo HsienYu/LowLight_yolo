@@ -118,6 +118,9 @@ data/
 # Ignore entire models directory
 models/
 
+# Exception: Track Zero-DCE++ weights
+!models/zero_dce_plus.pth
+
 # ============================================================================
 # 7. Results and Outputs
 # ============================================================================
