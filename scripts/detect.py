@@ -119,7 +119,9 @@ class PeopleDetector:
         # Legacy parameter for backward compatibility
         use_clahe: bool = None,
         # Preset configuration
-        preset: str = None
+        preset: str = None,
+        # Image mirroring
+        mirror: bool = True
     ):
         """
         Initialize the people detector.
@@ -144,6 +146,8 @@ class PeopleDetector:
             Device to run inference on ('cpu', 'mps', 'cuda', or None for auto)
         preset : str
             Preset configuration ('max_accuracy', 'balanced', 'real_time', or None)
+        mirror : bool
+            Whether to horizontally flip the input image (for natural mirror view)
         """
 
         # Apply preset configuration if specified
@@ -215,6 +219,7 @@ class PeopleDetector:
 
         self.conf_threshold = conf_threshold
         self.use_clahe = use_clahe
+        self.mirror = mirror
         
         # Set device
         if device is None:
@@ -241,6 +246,10 @@ class PeopleDetector:
         else:
             self.preprocessor = None
             print("CLAHE disabled")
+        
+        # Mirror setting
+        if mirror:
+            print("Image mirroring enabled (horizontal flip for natural mirror view)")
     
     def detect(
         self,
@@ -266,6 +275,10 @@ class PeopleDetector:
             - inference_time: Time taken for inference in seconds
         """
         start_time = time.time()
+
+        # Apply mirroring first (before any processing) for natural mirror view
+        if self.mirror:
+            image = cv2.flip(image, 1)  # Horizontal flip
 
         # Use hybrid detector if available
         if self.hybrid_detector:
@@ -353,13 +366,13 @@ class PeopleDetector:
                 
                 # Draw thin green bounding box (thickness=1 for thin line)
                 x1, y1, x2, y2 = map(int, bbox)
-                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 255, 0), 1)
+                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
                 # Draw label background and text
                 label = f"{class_name} {confidence:.2f}"
                 label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
                 cv2.rectangle(annotated_image, (x1, y1 - label_size[1] - 10), 
-                            (x1 + label_size[0], y1), (0, 255, 0), -1)
+                            (x1 + label_size[0], y1), (0, 255, 0),  -1)
                 cv2.putText(annotated_image, label, (x1, y1 - 5), 
                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
         else:
