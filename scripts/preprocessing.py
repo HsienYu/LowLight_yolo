@@ -188,6 +188,45 @@ class CLAHEPreprocessor:
         plt.show()
 
 
+def apply_clahe(
+    image: np.ndarray,
+    clip_limit: float = 2.0,
+    tile_size: int = 8,
+    apply_to_rgb: bool = False
+) -> np.ndarray:
+    """
+    Convenience function to apply CLAHE to an image.
+    
+    Parameters:
+    -----------
+    image : np.ndarray
+        Input image (BGR format)
+    clip_limit : float
+        CLAHE clip limit (default: 2.0)
+    tile_size : int
+        CLAHE tile grid size (default: 8)
+    apply_to_rgb : bool
+        Apply to RGB channels or luminance only (default: False)
+    
+    Returns:
+    --------
+    np.ndarray
+        Enhanced image in BGR format
+    
+    Example:
+    --------
+    >>> image = cv2.imread('dark_image.jpg')
+    >>> enhanced = apply_clahe(image, clip_limit=2.0, tile_size=8)
+    >>> cv2.imwrite('enhanced.jpg', enhanced)
+    """
+    preprocessor = CLAHEPreprocessor(
+        clip_limit=clip_limit,
+        tile_grid_size=(tile_size, tile_size),
+        apply_to_rgb=apply_to_rgb
+    )
+    return preprocessor.process(image)
+
+
 def main():
     """Command-line interface for CLAHE preprocessing."""
     parser = argparse.ArgumentParser(

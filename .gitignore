@@ -1,23 +1,26 @@
+# ============================================================================
 # Low-Light YOLO Project .gitignore
+# ============================================================================
 
-# ===================================
-# Python
-# ===================================
-# Virtual Environment
+# ============================================================================
+# 1. Python
+# ============================================================================
+
+# Virtual environments
 venv/
 env/
 ENV/
-.venv
+.venv/
 *.virtualenv
 
-# Python bytecode
+# Bytecode and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Distribution / packaging
+# Distribution and packaging
 build/
 develop-eggs/
 dist/
@@ -39,6 +42,10 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
+# ============================================================================
+# 2. IDEs and Editors
+# ============================================================================
+
 # PyCharm
 .idea/
 *.iml
@@ -48,78 +55,105 @@ pip-delete-this-directory.txt
 *.code-workspace
 
 # Jupyter Notebooks
-.ipynb_checkpoints
+.ipynb_checkpoints/
 *.ipynb
 
-# ===================================
-# ML Models & Data (Large Files)
-# ===================================
-# YOLO Model Weights (except if you want to track custom trained models)
+# Vim/Emacs
+*.swp
+*.swo
+*~
+
+#LLM
+.CLAUDE.md
+
+
+# ============================================================================
+# 3. ML Models and Weights (Large Files)
+# ============================================================================
+
+# Model files
 *.pt
 *.pth
 *.weights
 *.onnx
 *.tflite
 *.pb
-!yolov8s.pt  # Keep if you want to track the base model
+*.ckpt
 
-# Training runs & logs
+# Exception: Track base model if needed
+!yolov8s.pt
+
+# Training checkpoints
+checkpoints/
+
+# ============================================================================
+# 4. Training Outputs and Logs
+# ============================================================================
+
+# Training runs
 runs/
 wandb/
-*.log
 logs/
+*.log
 
 # TensorBoard
 events.out.tfevents.*
 
-# ===================================
-# Data Files (Very Important!)
-# ===================================
-# Videos - ZED SVO files are large
-data/videos/*.svo
-data/videos/*.svo2
-data/videos/*.mp4
-data/videos/*.avi
-data/videos/*.mov
+# ============================================================================
+# 5. Data Files (Critical - Large Files)
+# ============================================================================
 
-# Images - Raw dataset images
-data/images/*
-!data/images/.gitkeep
+# Ignore entire data directory
+data/
 
-# Labels - Annotations (you may want to track these)
-# Uncomment if you want to track labels
-# data/labels/*
-# !data/labels/.gitkeep
+# Dataset cache files
+*.cache
+*.pkl
+*.pickle
 
-# Processed data
-data/train/*
-data/val/*
-data/test/*
-data/enhanced/*
-data/*_cache/
-!data/**/.gitkeep
+# ============================================================================
+# 6. Models Directory
+# ============================================================================
 
-# ===================================
-# Results & Outputs
-# ===================================
+# Ignore entire models directory
+models/
+
+# ============================================================================
+# 7. Results and Outputs
+# ============================================================================
+
+# Ignore entire results directory
 results/
+
+# Other output directories
 outputs/
 predictions/
+
+# Image outputs
 *.jpg
 *.jpeg
 *.png
 *.gif
 *.bmp
-# Keep test results if needed
+
+# Keep structure if needed
 !results/.gitkeep
 
 # Exported frames
 frame_*.jpg
 frame_*.png
 
-# ===================================
-# MacOS Specific
-# ===================================
+# Test outputs
+test_*.jpg
+test_*.png
+*_test/
+*_debug/
+
+# ============================================================================
+# 8. Operating System Files
+# ============================================================================
+
+# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
@@ -137,54 +171,39 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-# ===================================
-# Temporary Files
-# ===================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================================================================
+# 9. Temporary Files
+# ============================================================================
+
 *.tmp
 *.temp
-*.swp
-*.swo
-*~
 .cache/
 tmp/
 temp/
 
-# ===================================
-# System & Editor
-# ===================================
-# Thumbnails
-Thumbs.db
+# ============================================================================
+# 10. Environment and Secrets
+# ============================================================================
 
-# Environment variables
 .env
 .env.local
 .env.*.local
 
-# ===================================
-# Project Specific
-# ===================================
-# Test outputs
-test_*.jpg
-test_*.png
-*_test/
-*_debug/
+# ============================================================================
+# 11. Documentation
+# ============================================================================
 
-# Checkpoints
-checkpoints/
-*.ckpt
-
-# Datasets cache
-*.cache
-*.pkl
-*.pickle
-
-# Documentation builds
 docs/_build/
 site/
 
-# ===================================
-# Optional: Keep Structure
-# ===================================
-# Uncomment these if you want to track empty directories
-# !.gitkeep
-# !*/.gitkeep
+# ============================================================================
+# Notes:
+# - Uncomment '!.gitkeep' and '!*/.gitkeep' to track empty directories
+# - Adjust data/labels/* section based on whether you track annotations
+# - Remove !yolov8s.pt exception if you don't want to track base model
+# ============================================================================

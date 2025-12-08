@@ -25,4 +25,4 @@ jupyter>=1.0.0               # Notebooks for experimentation
 ipython>=8.12.0              # Enhanced Python shell
 
 # Optional: Data annotation
-# labelImg>=1.8.6            # Annotation tool (install separately if needed)
+labelImg>=1.8.6            # Annotation tool
