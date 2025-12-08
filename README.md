@@ -11,22 +11,25 @@ This project implements an advanced detection pipeline with:
 
 ---
 
-## 📋 Features
+## Features
 
-- ✅ **Multiple Model Architectures**
+- **Multiple Model Architectures**
   - RT-DETR-X (highest accuracy)
   - YOLOv10m (best speed/accuracy balance)
   - YOLOv8m/s (real-time performance)
-- ✅ **CLAHE Preprocessing** - Classical, reliable enhancement (79.43% improvement)
-- ✅ **Optimized Presets** - One-command optimal configurations
-- ✅ **Batch Processing** - Process entire datasets with progress tracking
-- ✅ **MPS Support** - Optimized for Apple Silicon Macs
-- ✅ **Comparison Tools** - Benchmark multiple models side-by-side
-- ✅ **Production Ready** - Modular, maintainable architecture
+- **CLAHE Preprocessing** - Classical, reliable enhancement (79.43% improvement)
+- **Zero-DCE++ Support** - Advanced deep learning enhancement (optional)
+- **Optimized Presets** - One-command optimal configurations
+- **Video & Camera Support** - Real-time detection from camera/webcam
+- **Natural Mirror View** - Camera feed mirrors naturally (enabled by default)
+- **Batch Processing** - Process entire datasets with progress tracking
+- **MPS Support** - Optimized for Apple Silicon Macs
+- **Comparison Tools** - Benchmark multiple models side-by-side
+- **Production Ready** - Modular, maintainable architecture
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Choose Your Configuration
 
@@ -110,7 +113,67 @@ python scripts/batch_detect.py data/images --preset max_accuracy \
 
 ---
 
-## 📖 Detailed Usage
+## Detailed Usage
+
+### Command-Line Arguments Reference
+
+#### Basic Arguments
+
+```bash
+python scripts/detect.py [INPUT] [OPTIONS]
+```
+
+**Positional Arguments:**
+- `INPUT` - Input file path (image or video). Omit for camera mode.
+
+**Input Mode:**
+- `--camera` - Use camera input (default: camera ID 0)
+- `--camera-id ID` - Specify camera device ID (default: 0)
+- `--duration SECONDS` - Recording duration for camera mode
+
+**Output:**
+- `-o, --output PATH` - Output file path for results
+- `--show` - Display result window
+- `--no-window` - Disable display window (video mode)
+- `--save-stats` - Save detection statistics to CSV (video mode)
+
+#### Model & Preset Configuration
+
+**Presets (Recommended):**
+- `--preset max_accuracy` - RT-DETR-X + CLAHE (best detection)
+- `--preset balanced` - YOLOv10m + CLAHE (speed/accuracy balance)
+- `--preset real_time` - YOLOv8m + CLAHE (fastest)
+- `--preset ultra_accuracy` - RT-DETR-X + Zero-DCE++ (requires weights)
+- `--preset adaptive_smart` - YOLOv8m + Adaptive enhancement
+- `--preset ensemble_max` - YOLOv8m + Multi-enhancement fusion
+
+**Manual Model Selection:**
+- `-m, --model PATH` - Model file path (default: `models/yolov8s.pt`)
+- `--model-type TYPE` - Model architecture: `auto`, `yolo`, or `rtdetr` (default: auto)
+
+#### Enhancement Options
+
+**CLAHE Enhancement:**
+- `--clahe` - Enable CLAHE preprocessing
+- `--clip-limit FLOAT` - CLAHE clip limit (default: 2.0, range: 1.0-4.0)
+- `--tile-size INT` - CLAHE tile grid size (default: 8)
+- `--compare` - Compare results with/without CLAHE
+
+**Zero-DCE++ Enhancement (Advanced):**
+- `--zero-dce` - Enable Zero-DCE++ enhancement
+- `--hybrid-mode MODE` - Hybrid detection mode:
+  - `sequential` - Zero-DCE++ → YOLO pipeline (fast)
+  - `adaptive` - Auto-select enhancement based on brightness
+  - `ensemble` - Multi-path enhancement fusion (highest accuracy)
+
+#### Detection Parameters
+
+- `--conf FLOAT` - Confidence threshold (default: 0.25, range: 0.0-1.0)
+- `--device DEVICE` - Processing device: `cpu`, `mps`, or `cuda` (default: auto-detect)
+
+#### Image Processing
+
+- **Image Mirroring**: Enabled by default for natural mirror view (when you raise right hand, it appears on right side)
 
 ### Model Selection & Presets
 
@@ -212,31 +275,101 @@ python scripts/preprocessing.py input.jpg -o output.jpg \
   - Smaller = more local adaptation
   - Larger = smoother results
 
-### People Detection
+### Usage Examples
+
+#### Image Detection
 
 ```bash
 # Using presets (recommended)
-python scripts/detect.py input.jpg --preset max_accuracy -o result.jpg
+python scripts/detect.py image.jpg --preset max_accuracy -o result.jpg
+python scripts/detect.py image.jpg --preset balanced -o result.jpg
+python scripts/detect.py image.jpg --preset real_time -o result.jpg
 
 # Manual model + CLAHE
-python scripts/detect.py input.jpg -m rtdetr-x.pt --clahe -o result.jpg
+python scripts/detect.py image.jpg -m models/rtdetr-x.pt --clahe -o result.jpg
+python scripts/detect.py image.jpg -m models/yolov10m.pt --clahe -o result.jpg
 
-# Adjust detection confidence
-python scripts/detect.py input.jpg --preset balanced --conf 0.4 -o result.jpg
-
-# Force CPU (if MPS issues)
-python scripts/detect.py input.jpg --preset max_accuracy --device cpu -o result.jpg
+# Adjust detection confidence (higher = fewer, more confident detections)
+python scripts/detect.py image.jpg --preset balanced --conf 0.4 -o result.jpg
 
 # Compare with/without CLAHE
-python scripts/detect.py input.jpg -m rtdetr-x.pt --compare -o results/comparison/
+python scripts/detect.py image.jpg -m models/rtdetr-x.pt --compare -o results/comparison/
 
 # Display result window
-python scripts/detect.py input.jpg --preset max_accuracy --show
+python scripts/detect.py image.jpg --preset max_accuracy --show
+```
+
+#### Video Detection
+
+```bash
+# Process video with max accuracy
+python scripts/detect.py video.mp4 --preset max_accuracy -o output.mp4
+
+# Process without display window (headless)
+python scripts/detect.py video.mp4 --preset balanced --no-window -o output.mp4
+
+# Save detection statistics to CSV
+python scripts/detect.py video.mp4 --preset real_time --save-stats -o output.mp4
+# Creates video.mp4_stats.csv with frame-by-frame detection data
+
+# Process with custom confidence threshold
+python scripts/detect.py video.mp4 --preset balanced --conf 0.3 -o output.mp4
+```
+
+#### Camera/Webcam Detection
+
+```bash
+# Real-time detection from default camera (with natural mirror view)
+python scripts/detect.py --camera --preset balanced
+
+# Use specific camera ID
+python scripts/detect.py --camera --camera-id 1 --preset real_time
+
+# Record camera output to video
+python scripts/detect.py --camera --preset balanced -o recording.mp4
+
+# Record for specific duration (60 seconds)
+python scripts/detect.py --camera --preset real_time --duration 60 -o recording.mp4
+
+# Camera controls during detection:
+# - Press 'q' to quit
+# - Press 'p' to pause/resume
+# - Press 's' to save current frame
+```
+
+#### Advanced: Zero-DCE++ Enhancement
+
+```bash
+# Use Zero-DCE++ presets (requires model weights)
+python scripts/detect.py image.jpg --preset ultra_accuracy -o result.jpg
+python scripts/detect.py image.jpg --preset adaptive_smart -o result.jpg
+python scripts/detect.py image.jpg --preset ensemble_max -o result.jpg
+
+# Manual Zero-DCE++ configuration
+python scripts/detect.py image.jpg --zero-dce --hybrid-mode sequential -o result.jpg
+python scripts/detect.py image.jpg --zero-dce --hybrid-mode adaptive -o result.jpg
+python scripts/detect.py image.jpg --zero-dce --hybrid-mode ensemble -o result.jpg
+```
+
+#### Device Selection
+
+```bash
+# Auto-detect best device (default)
+python scripts/detect.py image.jpg --preset max_accuracy
+
+# Force CPU (if GPU issues)
+python scripts/detect.py image.jpg --preset max_accuracy --device cpu
+
+# Use Apple Silicon GPU (Mac)
+python scripts/detect.py image.jpg --preset balanced --device mps
+
+# Use NVIDIA GPU (Linux/Windows)
+python scripts/detect.py image.jpg --preset max_accuracy --device cuda
 ```
 
 ---
 
-## 📊 Data Collection & Annotation
+## Data Collection & Annotation
 
 ### Collecting On-Site Data
 
@@ -313,7 +446,7 @@ data/
 
 ---
 
-## 🎯 Fine-Tuning on Your Data
+## Fine-Tuning on Your Data
 
 ### Prepare Dataset
 
@@ -367,7 +500,7 @@ python scripts/evaluate.py \
 
 ---
 
-## 📈 Performance Benchmarks
+## Performance Benchmarks
 
 ### Real-World Results (Low-Light Theatre Environment)
 
@@ -411,7 +544,7 @@ python scripts/evaluate.py \
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### MPS (Mac) Issues
 
@@ -445,7 +578,7 @@ python scripts/detect.py input.jpg --clahe --tile-size 16
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 low_light_yolo/
@@ -481,14 +614,14 @@ low_light_yolo/
 
 ---
 
-## 🎓 Next Steps
+## Next Steps
 
-### Phase 1: Baseline (Week 1-2) ✅
-1. ✅ Set up environment
-2. ✅ Test pretrained YOLOv8s
-3. ✅ Implement CLAHE
-4. 📋 Collect initial 200-500 images
-5. 📋 Establish baseline metrics
+### Phase 1: Baseline (Week 1-2) - Complete
+1. Set up environment
+2. Test pretrained YOLOv8s
+3. Implement CLAHE
+4. Collect initial 200-500 images
+5. Establish baseline metrics
 
 ### Phase 2: Fine-tuning (Week 3-6)
 1. Expand dataset to 1,000+ images
@@ -506,7 +639,7 @@ low_light_yolo/
 
 ---
 
-## 📚 References
+## References
 
 - **YOLOv8**: [Ultralytics Documentation](https://docs.ultralytics.com/)
 - **CLAHE**: OpenCV Histogram Equalization
@@ -515,7 +648,7 @@ low_light_yolo/
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Improvements welcome! Focus areas:
 - Additional enhancement methods (Zero-DCE, etc.)
@@ -525,13 +658,13 @@ Improvements welcome! Focus areas:
 
 ---
 
-## 📄 License
+## License
 
 MIT License - Free for academic and commercial use.
 
 ---
 
-## 💡 Tips
+## Tips
 
 1. **Start small**: Test with 200-300 images before collecting more
 2. **Monitor metrics**: Track mAP50 during training
@@ -543,7 +676,7 @@ MIT License - Free for academic and commercial use.
 
 ---
 
-## ⚡ Quick Reference
+## Quick Reference
 
 ### Preset Configurations
 
@@ -556,6 +689,11 @@ MIT License - Free for academic and commercial use.
 
 # Real-time speed (YOLOv8m + CLAHE)
 --preset real_time
+
+# Advanced Zero-DCE++ presets (requires weights)
+--preset ultra_accuracy   # Best quality
+--preset adaptive_smart   # Smart enhancement
+--preset ensemble_max     # Highest accuracy
 ```
 
 ### Common Commands
@@ -563,6 +701,14 @@ MIT License - Free for academic and commercial use.
 ```bash
 # Single image detection
 python scripts/detect.py image.jpg --preset max_accuracy -o output.jpg
+
+# Video processing
+python scripts/detect.py video.mp4 --preset balanced -o output.mp4
+
+# Camera/Webcam (with natural mirror view)
+python scripts/detect.py --camera --preset balanced
+python scripts/detect.py --camera --preset real_time -o recording.mp4
+python scripts/detect.py --camera --duration 60 -o recording.mp4
 
 # Batch processing with saved images
 python scripts/batch_detect.py data/images --preset max_accuracy \
@@ -576,8 +722,16 @@ python scripts/batch_detect.py data/images --preset balanced \
     --save-images --max-images 50 --output-image-dir results/yolov10/
 
 # Manual model selection
-python scripts/detect.py image.jpg -m rtdetr-x.pt --clahe -o output.jpg
-python scripts/detect.py image.jpg -m yolov10m.pt --clahe -o output.jpg
+python scripts/detect.py image.jpg -m models/rtdetr-x.pt --clahe -o output.jpg
+python scripts/detect.py image.jpg -m models/yolov10m.pt --clahe -o output.jpg
+
+# Advanced CLAHE tuning
+python scripts/detect.py image.jpg --clahe --clip-limit 3.0 --tile-size 4
+
+# Device selection
+python scripts/detect.py image.jpg --preset max_accuracy --device cpu
+python scripts/detect.py image.jpg --preset balanced --device mps
+python scripts/detect.py image.jpg --preset max_accuracy --device cuda
 ```
 
 ### Model Files Location

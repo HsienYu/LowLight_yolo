@@ -29,7 +29,7 @@ try:
 except ImportError:
     ZERO_DCE_AVAILABLE = False
     HYBRID_DETECTORS_AVAILABLE = False
-    print("⚠️  Zero-DCE++ and hybrid detectors not available. Install requirements and download weights.")
+    print("WARNING: Zero-DCE++ and hybrid detectors not available. Install requirements and download weights.")
 
 
 class PeopleDetector:
@@ -158,11 +158,11 @@ class PeopleDetector:
             use_clahe = preset_config['use_clahe']
             use_zero_dce = preset_config.get('use_zero_dce', False)
             hybrid_mode = preset_config.get('hybrid_mode', None)
-            print(f"🎯 Using preset '{preset}': {preset_config['description']}")
+            print(f"Using preset '{preset}': {preset_config['description']}")
 
             # Check availability of advanced features
             if (use_zero_dce or hybrid_mode) and not HYBRID_DETECTORS_AVAILABLE:
-                print("⚠️  Advanced features require Zero-DCE++ and hybrid detectors. Falling back to CLAHE.")
+                print("WARNING: Advanced features require Zero-DCE++ and hybrid detectors. Falling back to CLAHE.")
                 use_clahe = True
                 use_zero_dce = False
                 hybrid_mode = None
@@ -327,7 +327,7 @@ class PeopleDetector:
 
         # Debug: Print class mapping for first run
         if hasattr(self, '_debug_printed') is False:
-            print(f"\n🔍 Debug - {self.model_type.upper()} Class Mapping:")
+            print(f"\nDebug - {self.model_type.upper()} Class Mapping:")
             for class_id, class_name in results.names.items():
                 print(f"  Class {class_id}: {class_name}")
             self._debug_printed = True
@@ -509,7 +509,7 @@ class PeopleDetector:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"\n📹 Video: {Path(video_path).name}")
+        print(f"\nVideo: {Path(video_path).name}")
         print(f"Resolution: {width}x{height} @ {fps}fps")
         print(f"Total frames: {total_frames}")
         print(f"Press 'q' to quit, 'p' to pause/resume\n")
@@ -581,7 +581,7 @@ class PeopleDetector:
                     break
                 elif key == ord('p'):
                     paused = not paused
-                    print(f"{'⏸️  Paused' if paused else '▶️  Resumed'}")
+                    print(f"{'Paused' if paused else 'Resumed'}")
         
         # Cleanup
         cap.release()
@@ -602,7 +602,7 @@ class PeopleDetector:
         print(f"Average FPS: {frame_count/total_time:.1f}")
         
         if output_path and out:
-            print(f"\n✅ Output video saved to: {output_path}")
+            print(f"\nOutput video saved to: {output_path}")
         
         # Save statistics
         if save_stats and stats:
@@ -612,7 +612,7 @@ class PeopleDetector:
                 writer = csv.DictWriter(f, fieldnames=['frame', 'detections', 'inference_time'])
                 writer.writeheader()
                 writer.writerows(stats)
-            print(f"\n📊 Statistics saved to: {stats_path}")
+            print(f"\nStatistics saved to: {stats_path}")
     
     def detect_camera(
         self,
@@ -642,7 +642,7 @@ class PeopleDetector:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30  # Default to 30 if not available
         
-        print(f"\n📷 Camera {camera_id} opened")
+        print(f"\nCamera {camera_id} opened")
         print(f"Resolution: {width}x{height}")
         print(f"Press 'q' to quit, 'p' to pause, 's' to save frame\n")
         
@@ -664,13 +664,13 @@ class PeopleDetector:
             while True:
                 # Check duration limit
                 if record_duration and (time.time() - start_time) > record_duration:
-                    print(f"\n⏱️  Recording duration limit reached ({record_duration}s)")
+                    print(f"\nRecording duration limit reached ({record_duration}s)")
                     break
                 
                 if not paused:
                     ret, frame = cap.read()
                     if not ret:
-                        print("\n⚠️  Failed to read frame")
+                        print("\nWARNING: Failed to read frame")
                         break
                     
                     # Detect
@@ -707,16 +707,16 @@ class PeopleDetector:
                     break
                 elif key == ord('p'):
                     paused = not paused
-                    print(f"{'⏸️  Paused' if paused else '▶️  Resumed'}")
+                    print(f"{'Paused' if paused else 'Resumed'}")
                 elif key == ord('s') and not paused:
                     # Save current frame
                     save_path = Path('results') / f'frame_{frame_count:06d}.jpg'
                     save_path.parent.mkdir(parents=True, exist_ok=True)
                     cv2.imwrite(str(save_path), annotated)
-                    print(f"💾 Saved frame to: {save_path}")
+                    print(f"Saved frame to: {save_path}")
         
         except KeyboardInterrupt:
-            print("\n⚠️  Interrupted by user")
+            print("\nInterrupted by user")
         
         finally:
             # Cleanup
@@ -737,7 +737,7 @@ class PeopleDetector:
             print(f"Average FPS: {frame_count/elapsed_time:.1f}" if elapsed_time > 0 else "N/A")
             
             if output_path and out:
-                print(f"\n✅ Output video saved to: {output_path}")
+                print(f"\nOutput video saved to: {output_path}")
 
 
 def main():
@@ -912,7 +912,7 @@ def main():
                     show_result=args.show
                 )
     else:
-        print("❌ Error: Please provide input (image/video file) or use --camera flag")
+        print("Error: Please provide input (image/video file) or use --camera flag")
         parser.print_help()
         return 1
     
