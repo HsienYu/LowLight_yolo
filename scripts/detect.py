@@ -23,13 +23,16 @@ from preprocessing import CLAHEPreprocessor
 
 try:
     from zero_dce import ZeroDCEEnhancer
+    from yola import YOLAEnhancer
     from hybrid_detector import SequentialDetector, AdaptiveDetector, EnsembleDetector
     ZERO_DCE_AVAILABLE = True
+    YOLA_AVAILABLE = True
     HYBRID_DETECTORS_AVAILABLE = True
 except ImportError:
     ZERO_DCE_AVAILABLE = False
+    YOLA_AVAILABLE = False
     HYBRID_DETECTORS_AVAILABLE = False
-    print("WARNING: Zero-DCE++ and hybrid detectors not available. Install requirements and download weights.")
+    print("WARNING: Advanced enhancement modules not available. Install requirements.")
 
 
 class PeopleDetector:
@@ -44,12 +47,14 @@ class PeopleDetector:
     Supported enhancements:
     - CLAHE (classical)
     - Zero-DCE++ (deep learning)
+    - YOLA (NeurIPS 2024 deep learning)
     - Hybrid methods
 
     Preset Configurations:
     - max_accuracy: RT-DETR-X + CLAHE (10 detections, 0.79 confidence, 1.186s)
     - balanced: YOLOv10m + CLAHE (3 detections, 0.66 confidence, 0.919s)
     - real_time: YOLOv8m + CLAHE (4 detections, 0.75 confidence, 0.626s)
+    - yola_max: RT-DETR-X + YOLA (High-precision low-light detection)
     """
 
     # Preset configurations based on theatre testing results
@@ -60,6 +65,7 @@ class PeopleDetector:
             'model_type': 'rtdetr',
             'use_clahe': True,
             'use_zero_dce': False,
+            'use_yola': False,
             'hybrid_mode': None,
             'description': 'Maximum accuracy: RT-DETR-X + CLAHE (10 people, 0.79 conf, 1.186s)'
         },
@@ -68,6 +74,7 @@ class PeopleDetector:
             'model_type': 'yolo',
             'use_clahe': True,
             'use_zero_dce': False,
+            'use_yola': False,
             'hybrid_mode': None,
             'description': 'Balanced performance: YOLOv10m + CLAHE (3 people, 0.66 conf, 0.919s)'
         },
@@ -76,6 +83,7 @@ class PeopleDetector:
             'model_type': 'yolo',
             'use_clahe': True,
             'use_zero_dce': False,
+            'use_yola': False,
             'hybrid_mode': None,
             'description': 'Real-time speed: YOLOv8m + CLAHE (4 people, 0.75 conf, 0.626s)'
         },
@@ -85,6 +93,7 @@ class PeopleDetector:
             'model_type': 'rtdetr',
             'use_clahe': False,
             'use_zero_dce': True,
+            'use_yola': False,
             'hybrid_mode': 'sequential',
             'description': 'Ultra accuracy: RT-DETR-X + Zero-DCE++ Sequential (best quality, slower)'
         },
@@ -93,6 +102,7 @@ class PeopleDetector:
             'model_type': 'yolo',
             'use_clahe': False,
             'use_zero_dce': True,
+            'use_yola': False,
             'hybrid_mode': 'adaptive',
             'description': 'Smart adaptive: YOLOv8m + Adaptive enhancement (auto-selects method)'
         },
@@ -101,8 +111,28 @@ class PeopleDetector:
             'model_type': 'yolo',
             'use_clahe': False,
             'use_zero_dce': True,
+            'use_yola': False,
             'hybrid_mode': 'ensemble',
             'description': 'Ensemble maximum: YOLOv8m + Multi-enhancement fusion (highest accuracy)'
+        },
+        # YOLA Presets
+        'yola_max': {
+            'model_path': 'models/rtdetr-x.pt',
+            'model_type': 'rtdetr',
+            'use_clahe': False,
+            'use_zero_dce': False,
+            'use_yola': True,
+            'hybrid_mode': None,
+            'description': 'YOLA Max: RT-DETR-X + YOLA Enhancement (NeurIPS 2024)'
+        },
+        'yola_balanced': {
+            'model_path': 'models/yolov10m.pt',
+            'model_type': 'yolo',
+            'use_clahe': False,
+            'use_zero_dce': False,
+            'use_yola': True,
+            'hybrid_mode': None,
+            'description': 'YOLA Balanced: YOLOv10m + YOLA Enhancement (NeurIPS 2024)'
         }
     }
 
@@ -114,6 +144,7 @@ class PeopleDetector:
         clahe_clip_limit: float = 2.0,
         clahe_tile_size: int = 8,
         zero_dce_weights: str = None,
+        yola_weights: str = None,
         conf_threshold: float = 0.25,
         device: str = None,
         # Legacy parameter for backward compatibility
@@ -133,7 +164,7 @@ class PeopleDetector:
         model_type : str
             Model architecture type ('yolo', 'rtdetr', or 'auto' for auto-detection)
         enhancement : str
-            Enhancement method ('none', 'clahe', 'zero_dce', 'hybrid')
+            Enhancement method ('none', 'clahe', 'zero_dce', 'yola', 'hybrid')
         use_clahe : bool
             Legacy parameter - whether to apply CLAHE preprocessing
         clahe_clip_limit : float
@@ -157,6 +188,7 @@ class PeopleDetector:
             model_type = preset_config['model_type']
             use_clahe = preset_config['use_clahe']
             use_zero_dce = preset_config.get('use_zero_dce', False)
+            use_yola = preset_config.get('use_yola', False)
             hybrid_mode = preset_config.get('hybrid_mode', None)
             print(f"Using preset '{preset}': {preset_config['description']}")
 
@@ -166,8 +198,15 @@ class PeopleDetector:
                 use_clahe = True
                 use_zero_dce = False
                 hybrid_mode = None
+            
+            if use_yola and not YOLA_AVAILABLE:
+                print("WARNING: YOLA enhancement not available. Falling back to CLAHE.")
+                use_clahe = True
+                use_yola = False
+
         else:
             use_zero_dce = False
+            use_yola = False
             hybrid_mode = None
 
         # Auto-detect model type from filename if not specified
@@ -182,6 +221,7 @@ class PeopleDetector:
 
         self.model_type = model_type
         self.use_zero_dce = use_zero_dce
+        self.use_yola = use_yola
         self.hybrid_mode = hybrid_mode
 
         # Initialize hybrid detector if specified
@@ -236,6 +276,18 @@ class PeopleDetector:
         
         print(f"Using device: {self.device}")
         
+        # Initialize YOLA enhancer if needed
+        self.yola_weights = yola_weights
+        if use_yola and YOLA_AVAILABLE:
+             # Default to models/yola.pth if not specified
+             if not self.yola_weights:
+                 default_path = Path('models/yola.pth')
+                 if default_path.exists():
+                     self.yola_weights = str(default_path)
+             
+             self.yola_enhancer = YOLAEnhancer(model_path=self.yola_weights, device=self.device)
+             print(f"YOLA enhancement enabled (weights: {self.yola_weights if self.yola_weights else 'Random - WARNING: Place weights in models/yola.pth for best results'})")
+
         # Initialize CLAHE preprocessor if needed
         if use_clahe:
             self.preprocessor = CLAHEPreprocessor(
@@ -288,8 +340,16 @@ class PeopleDetector:
                     image,
                     conf=self.conf_threshold
                 )
+            elif self.hybrid_mode == 'ensemble':
+                # EnsembleDetector returns (results, enhanced_images_dict)
+                results, enhanced_images_dict = self.hybrid_detector.detect(
+                    image,
+                    conf=self.conf_threshold
+                )
+                # Extract the best enhanced image from dictionary (use combined for best quality)
+                enhanced_image = enhanced_images_dict.get('combined', enhanced_images_dict.get('zero_dce', image))
             else:
-                # Sequential/Ensemble return (results, enhanced)
+                # Sequential return (results, enhanced)
                 results, enhanced_image = self.hybrid_detector.detect(
                     image,
                     conf=self.conf_threshold
@@ -311,6 +371,10 @@ class PeopleDetector:
                 if not hasattr(self, 'zero_dce_enhancer'):
                     self.zero_dce_enhancer = ZeroDCEEnhancer(device=self.device)
                 processed_image = self.zero_dce_enhancer.enhance(processed_image)
+
+            # Apply YOLA if enabled and available
+            if self.use_yola and YOLA_AVAILABLE and hasattr(self, 'yola_enhancer'):
+                processed_image = self.yola_enhancer.enhance(processed_image)
 
             # Run inference
             results = self.model(
@@ -348,8 +412,14 @@ class PeopleDetector:
             bbox = boxes.xyxy[i].cpu().numpy()  # [x1, y1, x2, y2]
             confidence = float(boxes.conf[i])
 
+            # Calculate center bottom point (feet position)
+            x1, y1, x2, y2 = bbox
+            center_bottom_x = int((x1 + x2) / 2)
+            center_bottom_y = int(y2)
+
             detections.append({
                 'bbox': bbox.tolist(),
+                'center_bottom': (center_bottom_x, center_bottom_y),
                 'confidence': confidence,
                 'class_id': class_id,
                 'class_name': class_name
@@ -368,8 +438,13 @@ class PeopleDetector:
                 x1, y1, x2, y2 = map(int, bbox)
                 cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
-                # Draw label background and text
-                label = f"{class_name} {confidence:.2f}"
+                # Calculate and draw center bottom point
+                center_bottom_x = (x1 + x2) // 2
+                center_bottom_y = y2
+                cv2.circle(annotated_image, (center_bottom_x, center_bottom_y), 5, (0, 0, 255), -1)  # Red filled circle
+                
+                # Draw label background and text (include center_bottom coords)
+                label = f"{class_name} {confidence:.2f} ({center_bottom_x},{center_bottom_y})"
                 label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
                 cv2.rectangle(annotated_image, (x1, y1 - label_size[1] - 10), 
                             (x1 + label_size[0], y1), (0, 255, 0),  -1)
@@ -407,7 +482,8 @@ class PeopleDetector:
         print(f"Detections: {len(detections)} people")
         print(f"Inference time: {inf_time:.3f}s")
         for i, det in enumerate(detections, 1):
-            print(f"  {i}. {det['class_name']}: {det['confidence']:.2f}")
+            cb = det['center_bottom']
+            print(f"  {i}. {det['class_name']}: {det['confidence']:.2f} | center_bottom: ({cb[0]}, {cb[1]})")
         
         # Save if output path provided
         if output_path:
@@ -788,21 +864,32 @@ def main():
     parser.add_argument(
         '--preset',
         type=str,
-        choices=['max_accuracy', 'balanced', 'real_time', 'ultra_accuracy', 'adaptive_smart', 'ensemble_max'],
+        choices=['max_accuracy', 'balanced', 'real_time', 'ultra_accuracy', 'adaptive_smart', 'ensemble_max', 'yola_max'],
         help='Use optimized preset configuration:\n' +
              'Basic CLAHE Presets:\n' +
              '  max_accuracy: RT-DETR-X + CLAHE (best standard detection)\n' +
              '  balanced: YOLOv10m + CLAHE (good speed/accuracy balance)\n' +
              '  real_time: YOLOv8m + CLAHE (fastest speed)\n' +
-             'Advanced Zero-DCE++ Presets:\n' +
-             '  ultra_accuracy: RT-DETR-X + Zero-DCE++ Sequential (highest quality)\n' +
-             '  adaptive_smart: YOLOv8m + Adaptive enhancement (auto-selects method)\n' +
-             '  ensemble_max: YOLOv8m + Multi-enhancement fusion (maximum accuracy)'
+             'Advanced Presets:\n' +
+             '  ultra_accuracy: RT-DETR-X + Zero-DCE++ Sequential\n' +
+             '  yola_max: RT-DETR-X + YOLA Enhancement (NeurIPS 2024)\n' +
+             '  adaptive_smart: YOLOv8m + Adaptive enhancement\n' +
+             '  ensemble_max: YOLOv8m + Multi-enhancement fusion'
     )
     parser.add_argument(
         '--zero-dce',
         action='store_true',
         help='Enable Zero-DCE++ enhancement (requires weights download)'
+    )
+    parser.add_argument(
+        '--yola',
+        action='store_true',
+        help='Enable YOLA enhancement'
+    )
+    parser.add_argument(
+        '--yola-weights',
+        type=str,
+        help='Path to YOLA pretrained weights'
     )
     parser.add_argument(
         '--hybrid-mode',
@@ -874,7 +961,8 @@ def main():
         clahe_tile_size=args.tile_size,
         conf_threshold=args.conf,
         device=args.device,
-        preset=args.preset
+        preset=args.preset,
+        yola_weights=args.yola_weights
     )
     
     # Determine input mode

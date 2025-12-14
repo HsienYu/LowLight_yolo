@@ -65,6 +65,9 @@ pip-delete-this-directory.txt
 
 #LLM
 .CLAUDE.md
+.claude/
+claude.md
+CLAUDE.md
 
 
 # ============================================================================

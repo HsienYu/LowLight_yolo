@@ -17,7 +17,9 @@ This project implements an advanced detection pipeline with:
   - RT-DETR-X (highest accuracy)
   - YOLOv10m (best speed/accuracy balance)
   - YOLOv8m/s (real-time performance)
+  - YOLOv11x (newest architecture)
 - **CLAHE Preprocessing** - Classical, reliable enhancement (79.43% improvement)
+- **YOLA (NeurIPS 2024)** - State-of-the-art illumination-invariant feature learning
 - **Zero-DCE++ Support** - Advanced deep learning enhancement (optional)
 - **Optimized Presets** - One-command optimal configurations
 - **Video & Camera Support** - Real-time detection from camera/webcam
@@ -25,6 +27,7 @@ This project implements an advanced detection pipeline with:
 - **Batch Processing** - Process entire datasets with progress tracking
 - **MPS Support** - Optimized for Apple Silicon Macs
 - **Comparison Tools** - Benchmark multiple models side-by-side
+- **Training & Evaluation** - Train custom models with your own datasets
 - **Production Ready** - Modular, maintainable architecture
 
 ---
@@ -38,6 +41,8 @@ This project implements an advanced detection pipeline with:
 | Preset | Model | Enhancement | Avg Detections | Speed | Best For |
 |--------|-------|-------------|----------------|-------|----------|
 | `max_accuracy` | RT-DETR-X | CLAHE | 14.26/image | 0.074s | Maximum detection accuracy |
+| `yola_max` | RT-DETR-X | YOLA | N/A | Slower | Best low-light features (NeurIPS '24) |
+| `yola_balanced` | YOLOv10m | YOLA | N/A | Medium | YOLA with faster detector |
 | `balanced` | YOLOv10m | CLAHE | 4.86/image | 0.036s | Speed/accuracy balance |
 | `real_time` | YOLOv8m | CLAHE | 3.78/image | 0.078s | Real-time applications |
 
@@ -47,26 +52,17 @@ This project implements an advanced detection pipeline with:
 # Maximum accuracy (recommended for low-light)
 python scripts/detect.py image.jpg --preset max_accuracy -o result.jpg
 
+# YOLA (State-of-the-Art Low-Light) - requires converted weights
+python scripts/detect.py image.jpg --preset yola_max --yola-weights models/yola_converted.pth -o result.jpg
+
+# YOLA with YOLOv10m (faster)
+python scripts/detect.py image.jpg --preset yola_balanced --yola-weights models/yola_converted.pth -o result.jpg
+
 # Balanced performance (fastest)
 python scripts/detect.py image.jpg --preset balanced -o result.jpg
 
 # Real-time (YOLOv8 compatibility)
 python scripts/detect.py image.jpg --preset real_time -o result.jpg
-```
-
-### 0. Extract Frames from ZED2i SVO Files (If Applicable)
-
-**If you have ZED2i camera SVO files**, see [ZED_SETUP.md](ZED_SETUP.md) for detailed instructions.
-
-**Quick version:**
-```bash
-# 1. Install ZED SDK from https://www.stereolabs.com/developers/release/
-
-# 2. Extract frames from all SVO files
-source venv/bin/activate
-python scripts/extract_svo_frames.py data/videos/ -o data/images/ --batch -i 30
-
-# This will extract every 30th frame (~1 fps) from all .svo/.svo2 files
 ```
 
 ### 1. Setup Environment
@@ -112,6 +108,40 @@ wget https://github.com/ultralytics/assets/releases/download/v8.3.0/rtdetr-x.pt
 
 cd ..
 ```
+
+#### YOLA (NeurIPS 2024)
+
+YOLA (You Only Look Around) is a state-of-the-art low-light enhancement module that learns illumination-invariant features.
+
+**Setup Steps:**
+
+1. **Download weights** from [YOLA Official Repo](https://github.com/MingboHong/YOLA) (Google Drive links in their README)
+
+2. **Install mmengine** (temporarily needed for conversion):
+   ```bash
+   pip install mmengine
+   ```
+
+3. **Convert weights** to standalone format:
+   ```bash
+   python scripts/convert_yola_weights.py models/yola.pth models/yola_converted.pth
+   ```
+
+4. **Run detection:**
+   ```bash
+   # With RT-DETR-X (highest accuracy)
+   python scripts/detect.py image.jpg --preset yola_max --yola-weights models/yola_converted.pth
+   
+   # With YOLOv10m (faster)
+   python scripts/detect.py image.jpg --preset yola_balanced --yola-weights models/yola_converted.pth
+   
+   # Combine YOLA + CLAHE
+   python scripts/detect.py image.jpg -m models/yolov10m.pt --yola --yola-weights models/yola_converted.pth --clahe
+   ```
+
+**Available YOLA Presets:**
+- `yola_max` - RT-DETR-X + YOLA (best quality)
+- `yola_balanced` - YOLOv10m + YOLA (faster)
 
 #### Zero-DCE++ Weights (Included)
 
@@ -185,6 +215,8 @@ python scripts/detect.py [INPUT] [OPTIONS]
 
 **Presets (Recommended):**
 - `--preset max_accuracy` - RT-DETR-X + CLAHE (best detection)
+- `--preset yola_max` - RT-DETR-X + YOLA (best low-light, requires weights)
+- `--preset yola_balanced` - YOLOv10m + YOLA (faster low-light)
 - `--preset balanced` - YOLOv10m + CLAHE (speed/accuracy balance)
 - `--preset real_time` - YOLOv8m + CLAHE (fastest)
 - `--preset ultra_accuracy` - RT-DETR-X + Zero-DCE++ (requires weights)
@@ -203,12 +235,22 @@ python scripts/detect.py [INPUT] [OPTIONS]
 - `--tile-size INT` - CLAHE tile grid size (default: 8)
 - `--compare` - Compare results with/without CLAHE
 
+**YOLA Enhancement (NeurIPS 2024):**
+- `--yola` - Enable YOLA enhancement
+- `--yola-weights PATH` - Path to YOLA weights (default: `models/yola_converted.pth`)
+
 **Zero-DCE++ Enhancement (Advanced):**
 - `--zero-dce` - Enable Zero-DCE++ enhancement
 - `--hybrid-mode MODE` - Hybrid detection mode:
   - `sequential` - Zero-DCE++ → YOLO pipeline (fast)
   - `adaptive` - Auto-select enhancement based on brightness
   - `ensemble` - Multi-path enhancement fusion (highest accuracy)
+
+**Combining Enhancements:**
+You can combine YOLA with CLAHE for potentially better results:
+```bash
+python scripts/detect.py image.jpg -m models/yolov10m.pt --yola --yola-weights models/yola_converted.pth --clahe
+```
 
 #### Detection Parameters
 
@@ -413,133 +455,68 @@ python scripts/detect.py image.jpg --preset max_accuracy --device cuda
 
 ---
 
-## Data Collection & Annotation
+## Training Your Own Model
 
-### Collecting On-Site Data
+> **Note:** Dataset annotation tools have been removed to streamline the project. For dataset preparation and annotation, use standard tools like:
+> - **LabelImg** - `pip install labelImg` for manual annotation
+> - **Roboflow** - [roboflow.com](https://roboflow.com) for team annotation
+> - **Ultralytics Auto-Annotate** - Use pretrained models to generate initial labels
 
-**Minimum Requirements:**
-- 500-1,000 images for fine-tuning
-- 3,740+ images for optimal results
+### Prerequisites
 
-**Capture Guidelines:**
-1. **Time Coverage:**
-   - Twilight (dusk/dawn)
-   - Night with artificial lighting
-   - Various ambient light levels
+Before training, you'll need:
+1. **Annotated dataset** in YOLO format:
+   ```
+   dataset/
+   ├── images/
+   │   ├── train/
+   │   ├── val/
+   │   └── test/
+   └── labels/
+       ├── train/
+       ├── val/
+       └── test/
+   ```
+2. **Dataset configuration** (dataset.yaml):
+   ```yaml
+   path: /path/to/dataset
+   train: images/train
+   val: images/val
+   test: images/test
+   
+   names:
+     0: person
+   ```
 
-2. **Scene Diversity:**
-   - Different distances (close, medium, far)
-   - Various poses (standing, walking, sitting)
-   - Occlusions (partial, full)
-   - Multiple people per frame
-
-3. **Image Quality:**
-   - Original resolution (no downscaling)
-   - Minimal motion blur
-   - Cover actual deployment conditions
-
-### Annotation Process
-
-**Option 1: LabelImg (Recommended for beginners)**
-
-```bash
-# Install
-pip install labelImg
-
-# Run
-labelImg data/images data/labels -classes person
-
-# Instructions:
-# - 'W' key: Create bounding box
-# - 'D' key: Next image
-# - 'A' key: Previous image
-# - Save: Auto-saves in YOLO format
-```
-
-**Option 2: Roboflow (Recommended for teams)**
-
-1. Create account at [roboflow.com](https://roboflow.com)
-2. Upload images
-3. Annotate 'people' class
-4. Export in YOLO format
-5. Download and extract to `data/`
-
-### Dataset Structure
-
-```
-data/
-├── images/          # All images
-│   ├── img001.jpg
-│   ├── img002.jpg
-│   └── ...
-├── labels/          # YOLO format labels
-│   ├── img001.txt
-│   ├── img002.txt
-│   └── ...
-├── train/           # Training set (80%)
-├── val/             # Validation set (10%)
-└── test/            # Test set (10%)
-```
-
-**Label Format (YOLO):**
-```
-0 0.5 0.5 0.3 0.4
-# class_id center_x center_y width height (all normalized 0-1)
-# class_id=0 for 'person'
-```
-
----
-
-## Fine-Tuning on Your Data
-
-### Prepare Dataset
+### Training
 
 ```bash
-# Convert annotations and split dataset
-python scripts/prepare_dataset.py \
-    --images data/images \
-    --labels data/labels \
-    --output data/ \
-    --split 0.8 0.1 0.1  # train/val/test ratios
-```
+# Basic training
+python scripts/train.py --data dataset.yaml --model yolov8m.pt --epochs 100
 
-This creates `dataset.yaml` configuration file.
-
-### Train Model
-
-```bash
-# Start fine-tuning
-python scripts/train.py \
-    --data data/dataset.yaml \
-    --model yolov8s.pt \
-    --epochs 100 \
-    --batch 16 \
-    --freeze 10  # Freeze first 10 layers
+# Training with specific configuration
+python scripts/train.py --data dataset.yaml --model yolov10m.pt --epochs 100 --batch 16
 
 # Monitor training
-tensorboard --logdir runs/
-
-# Or use Weights & Biases
-python scripts/train.py --data data/dataset.yaml --wandb
+tensorboard --logdir runs/train/
 ```
 
-**Training Parameters:**
+**Key Parameters:**
+- `--data`: Path to dataset.yaml configuration file
+- `--model`: Pretrained model to start from (yolov8s.pt, yolov8m.pt, yolov10m.pt, etc.)
 - `--epochs`: Training iterations (default: 100)
-- `--batch`: Batch size (adjust based on GPU memory)
-- `--freeze`: Number of layers to freeze (10 = freeze backbone)
+- `--batch`: Batch size, -1 for auto (default: -1)
 - `--patience`: Early stopping patience (default: 20)
-- `--device`: 'mps', 'cuda', or 'cpu'
+- `--device`: 'mps', 'cuda', or 'cpu' (auto-detect)
 
-### Evaluate Model
+### Evaluation
 
 ```bash
-# Evaluate on test set
-python scripts/evaluate.py \
-    --model models/best.pt \
-    --data data/dataset.yaml \
-    --split test
+# Evaluate on test/validation set
+python scripts/evaluate.py --data dataset.yaml --model runs/train/exp/weights/best.pt
 
-# Results: mAP50, mAP50-95, precision, recall, confusion matrix
+# Evaluate with custom confidence threshold
+python scripts/evaluate.py --data dataset.yaml --model best.pt --conf 0.3
 ```
 
 ---
@@ -572,12 +549,12 @@ python scripts/evaluate.py \
 | YOLOv8s + CLAHE | ~50-60% | +5-10% improvement |
 | RT-DETR-X + CLAHE | ~65-70% | Best pretrained performance |
 
-### After Fine-Tuning (500-1,000 images)
+### Expected Fine-Tuning Results
 
-| Method | mAP50 | Notes |
-|--------|-------|-------|
-| Fine-tuned YOLOv8 + CLAHE | **65-75%** | +10-20% over baseline |
-| Fine-tuned RT-DETR + CLAHE | **70-80%** | Best achievable performance |
+|| Method | mAP50 | Notes |
+||--------|-------|-------|
+|| Fine-tuned YOLOv8 + CLAHE | **65-75%** | +10-20% over baseline (500-1,000 images) |
+|| Fine-tuned RT-DETR + CLAHE | **70-80%** | Best achievable performance (500-1,000 images) |
 
 ### Research Benchmarks
 
@@ -629,73 +606,82 @@ low_light_yolo/
 ├── README.md                 # This file
 ├── requirements.txt          # Python dependencies
 │
-├── data/                     # Dataset
-│   ├── images/              # Raw images
-│   ├── labels/              # Annotations
-│   ├── train/               # Training split
-│   ├── val/                 # Validation split
-│   ├── test/                # Test split
-│   └── dataset.yaml         # YOLO dataset config
+├── data/                     # Dataset directory
+│   └── videos/              # Input videos (ZED2i SVO files, MP4, etc.)
 │
-├── models/                   # Trained models
-│   ├── best.pt              # Best checkpoint
-│   └── last.pt              # Latest checkpoint
+├── models/                   # Model weights
+│   ├── yolov8s.pt           # YOLOv8 Small (auto-downloaded, 22MB)
+│   ├── yolov8m.pt           # YOLOv8 Medium (auto-downloaded, 52MB)
+│   ├── yolov10s.pt          # YOLOv10 Small (auto-downloaded, 16MB)
+│   ├── yolov10m.pt          # YOLOv10 Medium (auto-downloaded, 33MB)
+│   ├── yolo11x.pt           # YOLOv11 XLarge (auto-downloaded, 115MB)
+│   ├── rtdetr-l.pt          # RT-DETR Large (auto-downloaded, 67MB)
+│   ├── rtdetr-x.pt          # RT-DETR XLarge (auto-downloaded, 136MB)
+│   ├── zero_dce_plus.pth    # Zero-DCE++ weights (315KB, included)
+│   └── yola_converted.pth   # YOLA weights (converted, see setup)
 │
 ├── scripts/                  # Main scripts
 │   ├── preprocessing.py     # CLAHE enhancement
-│   ├── detect.py            # Single image detection with presets
-│   ├── batch_detect.py      # Batch processing with CSV output
-│   ├── compare_methods.py   # Compare multiple enhancement methods
-│   ├── prepare_dataset.py   # Dataset preparation
-│   ├── train.py             # Training
-│   └── evaluate.py          # Evaluation
+│   ├── detect.py            # Single image/video/camera detection
+│   ├── batch_detect.py      # Batch processing
+│   ├── compare_methods.py   # Compare enhancement methods
+│   ├── train.py             # Model training
+│   ├── evaluate.py          # Model evaluation
+│   ├── yola.py              # YOLA enhancement (NeurIPS 2024)
+│   ├── zero_dce.py          # Zero-DCE++ enhancement
+│   ├── hybrid_detector.py   # Hybrid detection modes
+│   ├── convert_yola_weights.py  # Convert YOLA weights from MMDetection
+│   │
+│   ├── dataset/             # Dataset utilities (empty - for future use)
+│   │
+│   └── utils/               # Utilities
+│       └── images_to_video.py  # Convert image sequence to video
 │
-└── results/                  # Output results
-    ├── baseline/            # Detection results
-    ├── comparison/          # CLAHE comparisons
-    └── metrics/             # Evaluation metrics
+├── docs/                     # Documentation
+│   ├── ZED_SETUP.md         # ZED camera setup guide
+│   └── ZERO_DCE_GUIDE.md    # Zero-DCE++ usage guide
+│
+└── results/                  # Detection outputs (empty initially)
+    └── .gitkeep
 ```
 
 ---
 
 ## Next Steps
 
-### Phase 1: Baseline (Week 1-2) - Complete
-1. Set up environment
-2. Test pretrained YOLOv8s
-3. Implement CLAHE
-4. Collect initial 200-500 images
-5. Establish baseline metrics
+### Getting Started
+1. Install dependencies: `pip install -r requirements.txt`
+2. Test detection on an image: `python scripts/detect.py image.jpg --preset max_accuracy -o result.jpg`
+3. Process a video: `python scripts/detect.py video.mp4 --preset balanced -o output.mp4`
+4. Try camera detection: `python scripts/detect.py --camera --preset balanced`
 
-### Phase 2: Fine-tuning (Week 3-6)
-1. Expand dataset to 1,000+ images
-2. Annotate all images
-3. Fine-tune YOLOv8s
-4. Evaluate on test set
-5. Compare with baseline
-
-### Phase 3: Production (Week 7-9)
-1. Optimize CLAHE parameters
-2. Test robustness
-3. Deploy to target hardware
-4. Set up monitoring
-5. Document maintenance
+### For Training Your Own Model
+1. Prepare your dataset in YOLO format (images + labels)
+2. Create dataset.yaml configuration
+3. Train: `python scripts/train.py --data dataset.yaml --model yolov8m.pt`
+4. Evaluate: `python scripts/evaluate.py --data dataset.yaml --model runs/train/exp/weights/best.pt`
 
 ---
 
 ## References
 
-- **YOLOv8**: [Ultralytics Documentation](https://docs.ultralytics.com/)
+- **YOLOv8/v10/v11**: [Ultralytics Documentation](https://docs.ultralytics.com/)
+- **RT-DETR**: [Ultralytics RT-DETR](https://docs.ultralytics.com/models/rtdetr/)
+- **YOLA**: [You Only Look Around (NeurIPS 2024)](https://github.com/MingboHong/YOLA)
 - **CLAHE**: OpenCV Histogram Equalization
-- **ExDark Dataset**: [GitHub Repository](https://github.com/cs-chan/Exclusively-Dark-Image-Dataset)
-- **Research**: "Advancing low-light object detection with YOLO models" (2024)
+- **Zero-DCE++**: [Zero-Reference Deep Curve Estimation](https://github.com/Li-Chongyi/Zero-DCE_extension)
+- **ExDark Dataset**: [Exclusively Dark Image Dataset](https://github.com/cs-chan/Exclusively-Dark-Image-Dataset)
 
 ---
+
+## Project Status
+
+This project focuses on low-light people detection with pretrained models. Dataset annotation and preparation utilities have been removed to keep the codebase clean and focused. Use standard annotation tools (LabelImg, Roboflow, etc.) for creating custom datasets.
 
 ## Contributing
 
 Improvements welcome! Focus areas:
-- Additional enhancement methods (Zero-DCE, etc.)
+- Additional enhancement methods
 - Training optimizations
 - Deployment guides for edge devices
 - Performance benchmarks
@@ -727,6 +713,10 @@ MIT License - Free for academic and commercial use.
 ```bash
 # Maximum accuracy (RT-DETR-X + CLAHE)
 --preset max_accuracy
+
+# YOLA presets (requires weights)
+--preset yola_max        # RT-DETR-X + YOLA
+--preset yola_balanced   # YOLOv10m + YOLA
 
 # Balanced performance (YOLOv10m + CLAHE)
 --preset balanced
