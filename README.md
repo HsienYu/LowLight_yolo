@@ -127,6 +127,8 @@ YOLA (You Only Look Around) is a state-of-the-art low-light enhancement module t
    python scripts/convert_yola_weights.py models/yola.pth models/yola_converted.pth
    ```
 
+   Tip: if `models/yola_converted.pth` exists, `scripts/detect.py` will prefer it automatically (so you can often omit `--yola-weights`).
+
 4. **Run detection:**
    ```bash
    # With RT-DETR-X (highest accuracy)
@@ -143,9 +145,9 @@ YOLA (You Only Look Around) is a state-of-the-art low-light enhancement module t
 - `yola_max` - RT-DETR-X + YOLA (best quality)
 - `yola_balanced` - YOLOv10m + YOLA (faster)
 
-#### Zero-DCE++ Weights (Included)
+#### Zero-DCE++ Weights
 
-The Zero-DCE++ model weights (`models/zero_dce_plus.pth`, 315KB) are included in this repository for advanced low-light enhancement. No additional download needed.
+The Zero-DCE++ model weights are expected at `models/zero_dce_plus.pth` (not committed to git by default). Run `python scripts/download_zero_dce_weights.py` for download instructions (or to create dummy weights for smoke tests).
 
 **Required for these presets:**
 - `ultra_accuracy` - RT-DETR-X + Zero-DCE++ Sequential
@@ -237,7 +239,7 @@ python scripts/detect.py [INPUT] [OPTIONS]
 
 **YOLA Enhancement (NeurIPS 2024):**
 - `--yola` - Enable YOLA enhancement
-- `--yola-weights PATH` - Path to YOLA weights (default: `models/yola_converted.pth`)
+- `--yola-weights PATH` - Path to YOLA weights (recommended: `models/yola_converted.pth`; if omitted, detect.py will prefer it when present)
 
 **Zero-DCE++ Enhancement (Advanced):**
 - `--zero-dce` - Enable Zero-DCE++ enhancement
@@ -617,7 +619,7 @@ low_light_yolo/
 │   ├── yolo11x.pt           # YOLOv11 XLarge (auto-downloaded, 115MB)
 │   ├── rtdetr-l.pt          # RT-DETR Large (auto-downloaded, 67MB)
 │   ├── rtdetr-x.pt          # RT-DETR XLarge (auto-downloaded, 136MB)
-│   ├── zero_dce_plus.pth    # Zero-DCE++ weights (315KB, included)
+│   ├── zero_dce_plus.pth    # Zero-DCE++ weights (place/download here; not committed by default)
 │   └── yola_converted.pth   # YOLA weights (converted, see setup)
 │
 ├── scripts/                  # Main scripts
@@ -776,14 +778,16 @@ python scripts/detect.py image.jpg --preset max_accuracy --device cuda
 - `models/yolov10m.pt` - YOLOv10 Medium (balanced preset, 32MB)
 - `models/rtdetr-x.pt` - RT-DETR Extra Large (max_accuracy preset, 141MB)
 
-**Zero-DCE++ Model (Included):**
-- `models/zero_dce_plus.pth` - Zero-DCE++ weights (315KB, included in repo)
+**Zero-DCE++ Model Weights:**
+- `models/zero_dce_plus.pth` - Zero-DCE++ weights (place/download here; run `python scripts/download_zero_dce_weights.py`)
 
 All YOLO/RT-DETR models are downloaded automatically from Ultralytics on first use.
+Note: weight files are typically not committed to git (see `.gitignore`), so `models/` may be empty after a fresh clone.
+`scripts/detect.py` resolves `models/...` paths relative to the repo root so downloads/loads are consistent.
 For manual downloads, see the "Model Weights" section above.
 
 ---
 
 **Questions?** Check the scripts for detailed docstrings and usage examples.
 
-**Ready to deploy?** Start with `--preset max_accuracy` for best results! 🚀
+**Ready to deploy?** Start with `--preset max_accuracy` for best results!

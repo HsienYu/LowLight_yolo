@@ -14,12 +14,52 @@ from pathlib import Path
 from ultralytics import YOLO, RTDETR
 import argparse
 import time
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import sys
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 from preprocessing import CLAHEPreprocessor
+
+# Resolve paths relative to repo root (so models download to a consistent location)
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+MODELS_DIR = REPO_ROOT / 'models'
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+def _resolve_weights_path(path_str: Optional[str], *, prefer_models_dir: bool = True) -> Optional[str]:
+    """Resolve weights/model paths consistently relative to repo root.
+
+    Rules:
+    - Treat 'models/...' as repo-root relative (downloads land in REPO_ROOT/models).
+    - If a relative path exists as provided (relative to CWD), keep it.
+    - Otherwise, try REPO_ROOT/<path>.
+    - For filename-only weights (e.g. 'yolov8s.pt'), map to MODELS_DIR/<name>.
+    """
+    if not path_str:
+        return path_str
+    p = Path(path_str)
+    if p.is_absolute():
+        return str(p)
+
+    # Anchor explicit models/... paths to repo root
+    if p.parts and p.parts[0] == 'models':
+        return str(REPO_ROOT / p)
+
+    # If it exists relative to current working directory, keep it
+    if p.exists():
+        return str(p)
+
+    repo_candidate = REPO_ROOT / p
+    if repo_candidate.exists():
+        return str(repo_candidate)
+
+    # For bare filenames, prefer repo models dir to keep downloads organized
+    if prefer_models_dir and p.parent == Path('.'):
+        return str(MODELS_DIR / p.name)
+
+    return path_str
+
 try:
     from zero_dce import ZeroDCEEnhancer
     from yola import YOLAEnhancer
@@ -155,6 +195,10 @@ class PeopleDetector:
         device: str = None,
         # Legacy parameter for backward compatibility
         use_clahe: bool = None,
+        # Enhancement flags (used when not relying solely on presets)
+        use_zero_dce: bool = False,
+        use_yola: bool = False,
+        hybrid_mode: str = None,
         # Preset configuration
         preset: str = None,
         # Image mirroring
@@ -187,6 +231,11 @@ class PeopleDetector:
             Whether to horizontally flip the input image (for natural mirror view)
         """
 
+        # Keep track of explicit CLI flags; presets set defaults but flags can enable additional features
+        explicit_use_zero_dce = use_zero_dce
+        explicit_use_yola = use_yola
+        explicit_hybrid_mode = hybrid_mode
+
         # Apply preset configuration if specified
         if preset and preset in self.PRESETS:
             preset_config = self.PRESETS[preset]
@@ -211,9 +260,22 @@ class PeopleDetector:
                 use_yola = False
 
         else:
-            use_zero_dce = False
-            use_yola = False
-            hybrid_mode = None
+            use_zero_dce = explicit_use_zero_dce
+            use_yola = explicit_use_yola
+            hybrid_mode = explicit_hybrid_mode
+
+        # Apply explicit enhancement flags on top of preset defaults
+        if explicit_use_zero_dce:
+            use_zero_dce = True
+        if explicit_use_yola:
+            use_yola = True
+        if explicit_hybrid_mode:
+            hybrid_mode = explicit_hybrid_mode
+            use_zero_dce = True
+
+        # Resolve model weights path relative to repo root (stable across CWDs)
+        model_path = _resolve_weights_path(model_path)
+        resolved_zero_dce_weights = _resolve_weights_path(zero_dce_weights if zero_dce_weights else 'models/zero_dce_plus.pth')
 
         # Auto-detect model type from filename if not specified
         if model_type == 'auto':
@@ -229,12 +291,13 @@ class PeopleDetector:
         self.use_zero_dce = use_zero_dce
         self.use_yola = use_yola
         self.hybrid_mode = hybrid_mode
+        self.zero_dce_weights = resolved_zero_dce_weights
 
         # Initialize hybrid detector if specified
         if hybrid_mode and HYBRID_DETECTORS_AVAILABLE:
             print(f"Loading {hybrid_mode.upper()} hybrid detector with {model_type.upper()}")
             # Use default Zero-DCE weights path if not specified
-            zdce_weights = zero_dce_weights if zero_dce_weights else 'models/zero_dce_plus.pth'
+            zdce_weights = resolved_zero_dce_weights
             if hybrid_mode == 'sequential':
                 self.hybrid_detector = SequentialDetector(
                     yolo_model=model_path,
@@ -283,16 +346,21 @@ class PeopleDetector:
         print(f"Using device: {self.device}")
         
         # Initialize YOLA enhancer if needed
-        self.yola_weights = yola_weights
+        self.yola_weights = _resolve_weights_path(yola_weights)
         if use_yola and YOLA_AVAILABLE:
-             # Default to models/yola.pth if not specified
-             if not self.yola_weights:
-                 default_path = Path('models/yola.pth')
-                 if default_path.exists():
-                     self.yola_weights = str(default_path)
-             
-             self.yola_enhancer = YOLAEnhancer(model_path=self.yola_weights, device=self.device)
-             print(f"YOLA enhancement enabled (weights: {self.yola_weights if self.yola_weights else 'Random - WARNING: Place weights in models/yola.pth for best results'})")
+            # Prefer converted weights to avoid mmengine dependency
+            if not self.yola_weights:
+                for candidate in ('models/yola_converted.pth', 'models/yola.pth'):
+                    candidate_resolved = _resolve_weights_path(candidate)
+                    if candidate_resolved and Path(candidate_resolved).exists():
+                        self.yola_weights = candidate_resolved
+                        break
+
+            self.yola_enhancer = YOLAEnhancer(model_path=self.yola_weights, device=self.device)
+            if self.yola_weights:
+                print(f"YOLA enhancement enabled (weights: {self.yola_weights})")
+            else:
+                print("YOLA enhancement enabled (weights: Random - WARNING: Place weights in models/yola_converted.pth for best results)")
 
         # Initialize CLAHE preprocessor if needed
         if use_clahe:
@@ -375,7 +443,7 @@ class PeopleDetector:
             # Apply Zero-DCE++ if enabled and available
             if self.use_zero_dce and ZERO_DCE_AVAILABLE:
                 if not hasattr(self, 'zero_dce_enhancer'):
-                    self.zero_dce_enhancer = ZeroDCEEnhancer(device=self.device)
+                    self.zero_dce_enhancer = ZeroDCEEnhancer(model_path=self.zero_dce_weights, device=self.device)
                 processed_image = self.zero_dce_enhancer.enhance(processed_image)
 
             # Apply YOLA if enabled and available
@@ -1085,7 +1153,7 @@ def main():
     parser.add_argument(
         '--preset',
         type=str,
-        choices=['max_accuracy', 'balanced', 'real_time', 'ultra_accuracy', 'adaptive_smart', 'ensemble_max', 'yola_max'],
+        choices=['max_accuracy', 'balanced', 'real_time', 'ultra_accuracy', 'adaptive_smart', 'ensemble_max', 'yola_max', 'yola_balanced'],
         help='Use optimized preset configuration:\n' +
              'Basic CLAHE Presets:\n' +
              '  max_accuracy: RT-DETR-X + CLAHE (best standard detection)\n' +
@@ -1094,6 +1162,7 @@ def main():
              'Advanced Presets:\n' +
              '  ultra_accuracy: RT-DETR-X + Zero-DCE++ Sequential\n' +
              '  yola_max: RT-DETR-X + YOLA Enhancement (NeurIPS 2024)\n' +
+             '  yola_balanced: YOLOv10m + YOLA Enhancement (NeurIPS 2024)\n' +
              '  adaptive_smart: YOLOv8m + Adaptive enhancement\n' +
              '  ensemble_max: YOLOv8m + Multi-enhancement fusion'
     )
@@ -1110,7 +1179,7 @@ def main():
     parser.add_argument(
         '--yola-weights',
         type=str,
-        help='Path to YOLA pretrained weights'
+        help='Path to YOLA pretrained weights (recommended: models/yola_converted.pth)'
     )
     parser.add_argument(
         '--hybrid-mode',
@@ -1170,6 +1239,11 @@ def main():
         choices=['cpu', 'mps', 'cuda'],
         help='Device for inference (default: auto-detect)'
     )
+    parser.add_argument(
+        '--no-mirror',
+        action='store_true',
+        help='Disable horizontal image mirroring (natural mirror view)'
+    )
     
     args = parser.parse_args()
     
@@ -1183,7 +1257,11 @@ def main():
         conf_threshold=args.conf,
         device=args.device,
         preset=args.preset,
-        yola_weights=args.yola_weights
+        yola_weights=args.yola_weights,
+        mirror=not args.no_mirror,
+        hybrid_mode=args.hybrid_mode,
+        use_zero_dce=args.zero_dce,
+        use_yola=args.yola,
     )
     
     # Determine input mode
