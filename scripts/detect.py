@@ -20,7 +20,6 @@ import sys
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 from preprocessing import CLAHEPreprocessor
-
 try:
     from zero_dce import ZeroDCEEnhancer
     from yola import YOLAEnhancer
@@ -33,6 +32,13 @@ except ImportError:
     YOLA_AVAILABLE = False
     HYBRID_DETECTORS_AVAILABLE = False
     print("WARNING: Advanced enhancement modules not available. Install requirements.")
+
+# ZED SDK support
+try:
+    import pyzed.sl as sl
+    ZED_AVAILABLE = True
+except ImportError:
+    ZED_AVAILABLE = False
 
 
 class PeopleDetector:
@@ -808,6 +814,198 @@ class PeopleDetector:
             print("="*60)
             print(f"Total frames: {frame_count}")
             print(f"Total detections: {total_detections}")
+
+    def detect_camera_zed(
+        self,
+        camera_id: int = 0,
+        output_path: str = None,
+        record_duration: int = None,
+        resolution: str = 'HD2K',
+        fps: int = 15,
+        mirror: bool = False
+    ):
+        """
+        Real-time detection from ZED 2i camera feed.
+        
+        Parameters:
+        -----------
+        camera_id : int
+            ZED camera device ID (0 for default camera)
+        output_path : str
+            Path to save recorded video (optional)
+        record_duration : int
+            Maximum recording duration in seconds (None for unlimited)
+        resolution : str
+            Camera resolution: 'HD2K' (2208x1242), 'HD1080' (1920x1080), 'HD720' (1280x720), 'VGA' (672x376)
+        fps : int
+            Camera FPS: 15 or 30 (default: 15)
+        mirror : bool
+            Whether to horizontally flip the image (default: False)
+        """
+        if not ZED_AVAILABLE:
+            raise ImportError(
+                "ZED SDK not available. Please install pyzed SDK.\n"
+                "See docs/ZED_SETUP.md for installation instructions."
+            )
+        
+        # Map resolution string to ZED SDK enum
+        resolution_map = {
+            'HD2K': sl.RESOLUTION.HD2K,      # 2208x1242
+            'HD1080': sl.RESOLUTION.HD1080,  # 1920x1080
+            'HD720': sl.RESOLUTION.HD720,    # 1280x720
+            'VGA': sl.RESOLUTION.VGA         # 672x376
+        }
+        
+        if resolution not in resolution_map:
+            raise ValueError(f"Invalid resolution '{resolution}'. Choose from: {list(resolution_map.keys())}")
+        
+        if fps not in [15, 30, 60]:
+            raise ValueError(f"Invalid FPS '{fps}'. ZED 2i supports: 15, 30, or 60")
+        
+        # Initialize ZED camera
+        zed = sl.Camera()
+        
+        # Set configuration parameters
+        init_params = sl.InitParameters()
+        init_params.camera_resolution = resolution_map[resolution]
+        init_params.camera_fps = fps
+        init_params.depth_mode = sl.DEPTH_MODE.NONE  # We don't need depth for detection
+        
+        # Try to open the camera
+        err = zed.open(init_params)
+        if err != sl.ERROR_CODE.SUCCESS:
+            raise ValueError(f"Could not open ZED camera {camera_id}: {err}")
+        
+        # Get camera information
+        camera_info = zed.get_camera_information()
+        width = camera_info.camera_configuration.resolution.width
+        height = camera_info.camera_configuration.resolution.height
+        fps = camera_info.camera_configuration.fps
+        
+        print(f"\nZED Camera {camera_id} opened")
+        print(f"Model: {camera_info.camera_model}")
+        print(f"Resolution: {width}x{height} @ {fps}fps")
+        print(f"Serial Number: {camera_info.serial_number}")
+        print(f"Press 'q' to quit, 'p' to pause, 's' to save frame\n")
+        
+        # Create Mat objects to store images
+        image = sl.Mat()
+        
+        # Setup video writer if output specified
+        out = None
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+        
+        # Runtime parameters
+        runtime_params = sl.RuntimeParameters()
+        
+        # Statistics
+        frame_count = 0
+        total_detections = 0
+        start_time = time.time()
+        paused = False
+        
+        try:
+            while True:
+                # Check duration limit
+                if record_duration and (time.time() - start_time) > record_duration:
+                    print(f"\nRecording duration limit reached ({record_duration}s)")
+                    break
+                
+                if not paused:
+                    # Grab frame from ZED camera
+                    if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
+                        # Retrieve left image
+                        zed.retrieve_image(image, sl.VIEW.LEFT)
+                        
+                        # Convert to OpenCV format (numpy array)
+                        frame = image.get_data()
+                        
+                        # Convert RGBA to RGB (ZED SDK returns RGBA)
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
+                        
+                        # Apply mirroring if enabled
+                        if mirror:
+                            frame = cv2.flip(frame, 1)  # 1 = horizontal flip
+                        
+                        # Detect
+                        annotated, detections, inf_time = self.detect(frame)
+                        
+                        # Update statistics
+                        frame_count += 1
+                        num_detections = len(detections)
+                        total_detections += num_detections
+                        
+                        # Add info overlay
+                        cv2.putText(annotated, f"Frame: {frame_count}", 
+                                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.putText(annotated, f"People: {num_detections}", 
+                                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.putText(annotated, f"FPS: {1/inf_time:.1f}", 
+                                   (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        
+                        if record_duration:
+                            elapsed = time.time() - start_time
+                            remaining = record_duration - elapsed
+                            cv2.putText(annotated, f"Time: {remaining:.1f}s", 
+                                       (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        
+                        # Write to output video
+                        if out:
+                            out.write(annotated)
+                    else:
+                        print("\nWARNING: Failed to grab frame from ZED camera")
+                        break
+                
+                
+                # Resize for display (maintain aspect ratio)
+                display_width = 1280
+                display_height = 720
+                display_frame = cv2.resize(annotated, (display_width, display_height))
+                
+                # Show window
+                cv2.imshow('Real-time People Detection (ZED)', display_frame)
+                key = cv2.waitKey(1) & 0xFF
+                
+                if key == ord('q'):
+                    break
+                elif key == ord('p'):
+                    paused = not paused
+                    print(f"{'Paused' if paused else 'Resumed'}")
+                elif key == ord('s') and not paused:
+                    # Save current frame
+                    save_path = Path('results') / f'zed_frame_{frame_count:06d}.jpg'
+                    save_path.parent.mkdir(parents=True, exist_ok=True)
+                    cv2.imwrite(str(save_path), annotated)
+                    print(f"Saved frame to: {save_path}")
+        
+        except KeyboardInterrupt:
+            print("\nInterrupted by user")
+        
+        finally:
+            # Cleanup
+            zed.close()
+            if out:
+                out.release()
+            cv2.destroyAllWindows()
+            
+            # Print summary
+            elapsed_time = time.time() - start_time
+            print(f"\n" + "="*60)
+            print("ZED CAMERA DETECTION SUMMARY")
+            print("="*60)
+            print(f"Total frames: {frame_count}")
+            print(f"Total detections: {total_detections}")
+            print(f"Average detections/frame: {total_detections/frame_count:.2f}" if frame_count > 0 else "N/A")
+            print(f"Duration: {elapsed_time:.1f}s")
+            print(f"Average FPS: {frame_count/elapsed_time:.1f}" if elapsed_time > 0 else "N/A")
+            
+            if output_path and out:
+                print(f"\nOutput video saved to: {output_path}")
+
             print(f"Average detections/frame: {total_detections/frame_count:.2f}" if frame_count > 0 else "N/A")
             print(f"Duration: {elapsed_time:.1f}s")
             print(f"Average FPS: {frame_count/elapsed_time:.1f}" if elapsed_time > 0 else "N/A")
@@ -841,7 +1039,30 @@ def main():
     parser.add_argument(
         '--duration',
         type=int,
-        help='Recording duration in seconds (camera mode only)'
+        help='Recording duration in seconds (camera mode only)')
+    parser.add_argument(
+        '--zed',
+        action='store_true',
+        help='Use ZED 2i camera instead of regular webcam (requires ZED SDK)'
+    )
+    parser.add_argument(
+        '--zed-resolution',
+        type=str,
+        default='HD2K',
+        choices=['HD2K', 'HD1080', 'HD720', 'VGA'],
+        help='ZED camera resolution (default: HD2K). HD2K=2208x1242, HD1080=1920x1080, HD720=1280x720, VGA=672x376'
+    )
+    parser.add_argument(
+        '--zed-fps',
+        type=int,
+        default=15,
+        choices=[15, 30, 60],
+        help='ZED camera FPS (default: 15). Options: 15, 30, 60'
+    )
+    parser.add_argument(
+        '--zed-mirror',
+        action='store_true',
+        help='Horizontally flip the ZED camera image (mirror mode)'
     )
     parser.add_argument(
         '-o', '--output',
@@ -967,12 +1188,28 @@ def main():
     
     # Determine input mode
     if args.camera:
-        # Camera mode
-        detector.detect_camera(
-            camera_id=args.camera_id,
-            output_path=args.output,
-            record_duration=args.duration
-        )
+        # Camera mode - check if ZED camera requested
+        if args.zed:
+            if not ZED_AVAILABLE:
+                print("Error: ZED SDK not available. Please install pyzed SDK.")
+                print("See docs/ZED_SETUP.md for installation instructions.")
+                return 1
+            # ZED camera mode
+            detector.detect_camera_zed(
+                camera_id=args.camera_id,
+                output_path=args.output,
+                record_duration=args.duration,
+                resolution=args.zed_resolution,
+                fps=args.zed_fps,
+                mirror=args.zed_mirror
+            )
+        else:
+            # Regular webcam mode
+            detector.detect_camera(
+                camera_id=args.camera_id,
+                output_path=args.output,
+                record_duration=args.duration
+            )
     elif args.input:
         # Check if input is video or image
         input_path = Path(args.input)
@@ -1004,6 +1241,7 @@ def main():
         parser.print_help()
         return 1
     
+    return 0
     return 0
 
 
